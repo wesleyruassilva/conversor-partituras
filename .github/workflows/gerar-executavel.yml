@@ -1,0 +1,94 @@
+name: Gerar executável para Windows
+
+# Roda sozinho a cada alteração no código e também pode ser
+# disparado à mão na aba "Actions" do GitHub.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar ferramentas de empacotamento
+        run: pip install pyinstaller tkinterdnd2
+
+      - name: Baixar o Audiveris (versão Console, mais recente)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $rel = Invoke-RestMethod -Headers @{ Authorization = "Bearer $env:GH_TOKEN" } `
+                 'https://api.github.com/repos/Audiveris/audiveris/releases/latest'
+          $msi = $rel.assets | Where-Object { $_.name -match 'windowsConsole.*\.msi$' } | Select-Object -First 1
+          if (-not $msi) { $msi = $rel.assets | Where-Object { $_.name -match 'windows.*\.msi$' } | Select-Object -First 1 }
+          if (-not $msi) { throw "Instalador do Audiveris para Windows não encontrado." }
+          Write-Host "Usando $($msi.name)"
+          Invoke-WebRequest $msi.browser_download_url -OutFile audiveris.msi
+          "AUDIVERIS_VERSAO=$($rel.tag_name)" | Out-File -Append $env:GITHUB_ENV
+
+      - name: Extrair o Audiveris sem instalar
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:RUNNER_TEMP 'aud'
+          $msi = (Resolve-Path audiveris.msi).Path
+          Start-Process msiexec.exe -Wait -NoNewWindow -ArgumentList "/a `"$msi`" /qn TARGETDIR=`"$dest`""
+          $exe = Get-ChildItem $dest -Recurse -Filter Audiveris.exe | Select-Object -First 1
+          if (-not $exe) { throw "Audiveris.exe não encontrado após extrair o MSI." }
+          Write-Host "Audiveris em $($exe.DirectoryName)"
+          "AUDIVERIS_DIR=$($exe.DirectoryName)" | Out-File -Append $env:GITHUB_ENV
+
+      - name: Baixar dicionários de texto (letras)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force tessdata | Out-Null
+          foreach ($l in 'eng','por','lat','ita') {
+            Invoke-WebRequest "https://github.com/tesseract-ocr/tessdata/raw/main/$l.traineddata" -OutFile "tessdata\$l.traineddata"
+          }
+
+      - name: Gerar o executável
+        run: >
+          pyinstaller --noconfirm --windowed --onedir
+          --name ConversorPartituras
+          --collect-all tkinterdnd2
+          conversor_partituras.pyw
+
+      - name: Montar a pasta portátil
+        shell: pwsh
+        run: |
+          $app = 'dist\ConversorPartituras'
+          Copy-Item -Recurse $env:AUDIVERIS_DIR "$app\audiveris"
+          Copy-Item -Recurse tessdata "$app\tessdata"
+          Copy-Item LEIA-ME.txt, LICENSE $app
+
+      - name: Testar o Audiveris embutido
+        shell: pwsh
+        run: |
+          & 'dist\ConversorPartituras\audiveris\Audiveris.exe' -batch -version
+          if ($LASTEXITCODE -ne 0) { throw "O Audiveris embutido não respondeu." }
+
+      - name: Compactar
+        shell: pwsh
+        run: Compress-Archive -Path dist\ConversorPartituras -DestinationPath ConversorPartituras-Windows.zip
+
+      - name: Publicar para download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.${{ github.run_number }}
+          name: Conversor de Partituras v1.${{ github.run_number }}
+          body: |
+            Versão portátil para Windows. Baixe o ZIP, descompacte e abra **ConversorPartituras.exe**.
+            Não precisa instalar Python nem Audiveris.
+            Audiveris embutido: ${{ env.AUDIVERIS_VERSAO }}.
+          files: ConversorPartituras-Windows.zip
+          make_latest: true

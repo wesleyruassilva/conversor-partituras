@@ -1,0 +1,22 @@
+# Conversor de Partituras
+
+Converte partituras em PDF (ou imagem) para **MusicXML**, com uma janela simples para Windows.
+Usa o [Audiveris](https://github.com/Audiveris/audiveris) por trás.
+
+## Baixar
+
+Vá em **[Releases](../../releases/latest)**, baixe `ConversorPartituras-Windows.zip`, descompacte e abra `ConversorPartituras.exe`.
+Não precisa instalar Python nem Audiveris.
+
+## Como o executável é gerado
+
+O GitHub Actions (`.github/workflows/gerar-executavel.yml`) roda num Windows virtual a cada alteração em `main`:
+
+1. baixa a versão Console mais recente do Audiveris e extrai sem instalar;
+2. baixa os dicionários de texto (português, inglês, latim, italiano);
+3. empacota o app com PyInstaller;
+4. publica o ZIP portátil em *Releases*.
+
+## Licença
+
+AGPL-3.0, a mesma do Audiveris.

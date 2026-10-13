@@ -1,0 +1,45 @@
+CONVERSOR DE PARTITURAS — PDF para MusicXML
+============================================
+
+Versão portátil: não precisa instalar nada.
+
+COMO USAR
+
+1. Descompacte o ZIP numa pasta (ex.: Documentos).
+2. Abra ConversorPartituras.exe.
+3. Clique em "Adicionar arquivos" (ou arraste os PDFs para a lista).
+4. Escolha o idioma das letras, se houver.
+5. Clique em "Converter".
+6. Ao terminar, dê dois cliques no arquivo da lista para abrir
+   o resultado (.mxl) no MuseScore ou outro editor.
+
+Dica: clique com o botão direito no .exe e crie um atalho
+na área de trabalho.
+
+
+NA PRIMEIRA VEZ
+
+O Windows pode mostrar "O Windows protegeu o computador".
+Clique em "Mais informações" e depois em "Executar assim mesmo".
+Isso acontece porque o programa não tem assinatura digital paga.
+
+
+SE ALGO DER ERRADO
+
+- "Falhou": selecione o arquivo e clique em "Ver detalhes".
+- "Revisar (N avisos)": a conversão saiu, mas o reconhecimento
+  teve dificuldades. Confira o resultado com atenção.
+- Cada página pode levar de alguns segundos a um minuto.
+
+
+QUALIDADE
+
+PDFs gerados por programas de notação convertem bem.
+Escaneados ou manuscritos sempre precisam de revisão.
+Para melhores resultados, use digitalizações em 300 dpi.
+
+
+LICENÇA
+
+AGPL-3.0, a mesma do Audiveris, que vai embutido.
+Código-fonte: https://github.com/wesleyruassilva/conversor-partituras
