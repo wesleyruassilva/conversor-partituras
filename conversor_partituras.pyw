@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -113,6 +114,7 @@ def converter(audiveris, entrada, pasta_saida, ao_ler_linha=None, ao_iniciar=Non
     pasta_saida = Path(pasta_saida)
     pasta_saida.mkdir(parents=True, exist_ok=True)
     antes = {p: p.stat().st_mtime for p in pasta_saida.rglob("*.mxl")}
+    inicio = time.time() - 2  # margem para relógio do sistema de arquivos
 
     cmd = [audiveris, "-batch", "-transcribe", "-export", "-output", str(pasta_saida)]
     if idioma:
@@ -144,6 +146,16 @@ def converter(audiveris, entrada, pasta_saida, ao_ler_linha=None, ao_iniciar=Non
     gerados = sorted(p for p in pasta_saida.rglob("*.mxl")
                      if p.stem.startswith(entrada.stem)
                      and (p not in antes or p.stat().st_mtime > antes[p]))
+
+    # Apaga os arquivos técnicos (.omr e .log) criados nesta conversão.
+    # O registro continua disponível em "Ver detalhes".
+    for extensao in ("*.omr", "*.log"):
+        for p in pasta_saida.rglob(extensao):
+            try:
+                if p.name.startswith(entrada.stem) and p.stat().st_mtime >= inicio:
+                    p.unlink()
+            except OSError:
+                pass
     if not gerados:
         raise RuntimeError("O Audiveris não gerou nenhum MusicXML "
                            f"(código de saída {proc.returncode}).")
