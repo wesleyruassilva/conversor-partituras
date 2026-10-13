@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Conversor de Partituras — PDF -> MusicXML
+Nature Conversor — partituras em PDF para MuseScore e MusicXML
 Interface amigável para o Audiveris (https://audiveris.github.io).
 
 Requisitos: Python 3.9+ (com Tkinter, padrão no instalador do Windows)
@@ -21,9 +21,9 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-APP_NOME = "Conversor de Partituras"
+APP_NOME = "Nature Conversor"
 EXTENSOES = (".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp")
-CONFIG = Path(os.environ.get("APPDATA", Path.home())) / "ConversorPartituras" / "config.json"
+CONFIG = Path(os.environ.get("APPDATA", Path.home())) / "NatureConversor" / "config.json"
 
 # Etapas do Audiveris, para mostrar progresso legível
 ETAPAS = {
@@ -249,8 +249,8 @@ class App:
         f = ttk.Frame(self.raiz, padding=16)
         f.pack(fill="both", expand=True)
 
-        ttk.Label(f, text="Converter partitura para MuseScore e MusicXML",
-                  style="Titulo.TLabel").pack(anchor="w")
+        ttk.Label(f, text=APP_NOME, style="Titulo.TLabel").pack(anchor="w")
+        ttk.Label(f, text="Partituras em PDF para MuseScore e MusicXML").pack(anchor="w")
         dica = ("1. Adicione os arquivos   2. Clique em Converter   3. Abra o resultado"
                 + ("   •   Você também pode arrastar arquivos para a lista" if TEM_DND else ""))
         ttk.Label(f, text=dica, style="Dica.TLabel").pack(anchor="w", pady=(2, 12))

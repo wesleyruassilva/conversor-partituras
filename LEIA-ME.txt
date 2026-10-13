@@ -1,12 +1,12 @@
-CONVERSOR DE PARTITURAS — PDF para MusicXML
-============================================
+NATURE CONVERSOR — Partituras em PDF para MuseScore e MusicXML
+==============================================================
 
 Versão portátil: não precisa instalar nada.
 
 COMO USAR
 
 1. Descompacte o ZIP numa pasta (ex.: Documentos).
-2. Abra ConversorPartituras.exe.
+2. Abra "Nature Conversor.exe".
 3. Clique em "Adicionar arquivos" (ou arraste os PDFs para a lista).
 4. Escolha o idioma das letras, se houver.
 5. Deixe marcada a opção "Também criar arquivo do MuseScore"

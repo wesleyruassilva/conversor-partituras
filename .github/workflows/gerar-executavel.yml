@@ -59,14 +59,14 @@ jobs:
       - name: Gerar o executável
         run: >
           pyinstaller --noconfirm --windowed --onedir
-          --name ConversorPartituras
+          --name "Nature Conversor"
           --collect-all tkinterdnd2
-          conversor_partituras.pyw
+          nature_conversor.pyw
 
       - name: Montar a pasta portátil
         shell: pwsh
         run: |
-          $app = 'dist\ConversorPartituras'
+          $app = 'dist\Nature Conversor'
           Copy-Item -Recurse $env:AUDIVERIS_DIR "$app\audiveris"
           Copy-Item -Recurse tessdata "$app\tessdata"
           Copy-Item LEIA-ME.txt, LICENSE $app
@@ -74,21 +74,21 @@ jobs:
       - name: Testar o Audiveris embutido
         shell: pwsh
         run: |
-          & 'dist\ConversorPartituras\audiveris\Audiveris.exe' -batch -version
+          & 'dist\Nature Conversor\audiveris\Audiveris.exe' -batch -version
           if ($LASTEXITCODE -ne 0) { throw "O Audiveris embutido não respondeu." }
 
       - name: Compactar
         shell: pwsh
-        run: Compress-Archive -Path dist\ConversorPartituras -DestinationPath ConversorPartituras-Windows.zip
+        run: Compress-Archive -Path 'dist\Nature Conversor' -DestinationPath NatureConversor-Windows.zip
 
       - name: Publicar para download
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.${{ github.run_number }}
-          name: Conversor de Partituras v1.${{ github.run_number }}
+          name: Nature Conversor v1.${{ github.run_number }}
           body: |
-            Versão portátil para Windows. Baixe o ZIP, descompacte e abra **ConversorPartituras.exe**.
+            Versão portátil para Windows. Baixe o ZIP, descompacte e abra **Nature Conversor.exe**.
             Não precisa instalar Python nem Audiveris.
             Audiveris embutido: ${{ env.AUDIVERIS_VERSAO }}.
-          files: ConversorPartituras-Windows.zip
+          files: NatureConversor-Windows.zip
           make_latest: true

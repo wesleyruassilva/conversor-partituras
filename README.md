@@ -1,11 +1,11 @@
-# Conversor de Partituras
+# Nature Conversor
 
 Converte partituras em PDF (ou imagem) para **MuseScore (.mscz)** e **MusicXML**, com uma janela simples para Windows.
 Usa o [Audiveris](https://github.com/Audiveris/audiveris) para o reconhecimento e o MuseScore instalado no computador para gerar o `.mscz`.
 
 ## Baixar
 
-Vá em **[Releases](../../releases/latest)**, baixe `ConversorPartituras-Windows.zip`, descompacte e abra `ConversorPartituras.exe`.
+Vá em **[Releases](../../releases/latest)**, baixe `NatureConversor-Windows.zip`, descompacte e abra `Nature Conversor.exe`.
 Não precisa instalar Python nem Audiveris.
 
 ## Como o executável é gerado
