@@ -9,9 +9,15 @@ COMO USAR
 2. Abra ConversorPartituras.exe.
 3. Clique em "Adicionar arquivos" (ou arraste os PDFs para a lista).
 4. Escolha o idioma das letras, se houver.
-5. Clique em "Converter".
-6. Ao terminar, dê dois cliques no arquivo da lista para abrir
-   o resultado (.mxl) no MuseScore ou outro editor.
+5. Deixe marcada a opção "Também criar arquivo do MuseScore"
+   para receber o .mscz além do MusicXML (.mxl).
+6. Clique em "Converter".
+7. Ao terminar, dê dois cliques no arquivo da lista para abrir
+   o resultado direto no MuseScore.
+
+O arquivo .mscz é criado pelo MuseScore instalado no seu
+computador (musescore.org). Sem ele, o programa entrega só
+o MusicXML, que o MuseScore também abre.
 
 Dica: clique com o botão direito no .exe e crie um atalho
 na área de trabalho.

@@ -150,6 +150,51 @@ def converter(audiveris, entrada, pasta_saida, ao_ler_linha=None, ao_iniciar=Non
     return gerados, avisos, "\n".join(log)
 
 
+def localizar_musescore(cfg):
+    """Procura o MuseScore instalado (4 ou 3)."""
+    salvo = cfg.get("musescore")
+    if salvo and Path(salvo).is_file():
+        return salvo
+    candidatos = []
+    for base in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)"),
+                 os.environ.get("LOCALAPPDATA"), r"C:\Program Files"):
+        if not base:
+            continue
+        for pasta, exe in (("MuseScore 4", "MuseScore4.exe"),
+                           ("MuseScore Studio 4", "MuseScore4.exe"),
+                           ("MuseScore 3", "MuseScore3.exe")):
+            candidatos.append(Path(base) / pasta / "bin" / exe)
+    for c in candidatos:
+        if c.is_file():
+            return str(c)
+    for nome in ("MuseScore4", "mscore4portable", "MuseScore3", "mscore"):
+        achado = shutil.which(nome)
+        if achado:
+            return achado
+    return None
+
+
+def para_musescore(musescore, mxl, ao_iniciar=None):
+    """Converte um .mxl em .mscz usando o MuseScore. Devolve o caminho do .mscz."""
+    mxl = Path(mxl)
+    destino = mxl.with_suffix(".mscz")
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    proc = subprocess.Popen([musescore, "-o", str(destino), str(mxl)],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            creationflags=flags)
+    if ao_iniciar:
+        ao_iniciar(proc)
+    try:
+        saida, _ = proc.communicate(timeout=300)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        raise RuntimeError("O MuseScore demorou demais e foi interrompido.")
+    if not destino.is_file():
+        texto = saida.decode("utf-8", errors="replace")[-2000:]
+        raise RuntimeError(f"O MuseScore não gerou o arquivo .mscz.\n{texto}")
+    return destino
+
+
 def abrir(caminho):
     if sys.platform.startswith("win"):
         os.startfile(caminho)  # noqa: abre no programa padrão (ex.: MuseScore)
@@ -165,15 +210,16 @@ class App:
         self.raiz = raiz
         self.cfg = carregar_config()
         self.audiveris = localizar_audiveris(self.cfg)
-        self.itens = {}          # id da linha -> dict(arquivo, saidas, log)
+        self.musescore = localizar_musescore(self.cfg)
+        self.itens = {}          # id da linha -> dict(arquivo, saidas, mscz, log)
         self.fila = queue.Queue()
         self.processo = None
         self.cancelar = False
         self.rodando = False
 
         raiz.title(APP_NOME)
-        raiz.geometry("760x560")
-        raiz.minsize(620, 460)
+        raiz.geometry("780x620")
+        raiz.minsize(640, 520)
         self._estilo()
         self._montar()
         self._atualizar_status_audiveris()
@@ -191,7 +237,8 @@ class App:
         f = ttk.Frame(self.raiz, padding=16)
         f.pack(fill="both", expand=True)
 
-        ttk.Label(f, text="Converter partitura em MusicXML", style="Titulo.TLabel").pack(anchor="w")
+        ttk.Label(f, text="Converter partitura para MuseScore e MusicXML",
+                  style="Titulo.TLabel").pack(anchor="w")
         dica = ("1. Adicione os arquivos   2. Clique em Converter   3. Abra o resultado"
                 + ("   •   Você também pode arrastar arquivos para a lista" if TEM_DND else ""))
         ttk.Label(f, text=dica, style="Dica.TLabel").pack(anchor="w", pady=(2, 12))
@@ -246,6 +293,17 @@ class App:
         ttk.Combobox(lin, textvariable=self.idioma, values=list(IDIOMAS),
                      state="readonly", width=16).pack(side="left", padx=6)
 
+        # Formato MuseScore
+        ms = ttk.Frame(f)
+        ms.pack(fill="x", pady=(0, 8))
+        self.gerar_mscz = tk.BooleanVar(value=self.cfg.get("gerar_mscz", True))
+        ttk.Checkbutton(ms, text="Também criar arquivo do MuseScore (.mscz)",
+                        variable=self.gerar_mscz).pack(side="left")
+        self.ms_msg = tk.StringVar()
+        ttk.Label(ms, textvariable=self.ms_msg, style="Dica.TLabel").pack(side="left", padx=8)
+        ttk.Button(ms, text="Localizar MuseScore…",
+                   command=self._localizar_musescore).pack(side="left")
+
         # Progresso e ação
         self.progresso = ttk.Progressbar(f, mode="determinate")
         self.progresso.pack(fill="x")
@@ -270,6 +328,20 @@ class App:
             self.aud_msg.set("Audiveris: encontrado ✔")
         else:
             self.aud_msg.set("Audiveris: não encontrado ✖")
+        if self.musescore:
+            self.ms_msg.set("MuseScore: encontrado ✔")
+        else:
+            self.ms_msg.set("MuseScore: não encontrado ✖")
+
+    def _localizar_musescore(self):
+        cam = filedialog.askopenfilename(
+            title="Onde está o MuseScore? (pasta bin, MuseScore4.exe)",
+            filetypes=[("MuseScore", "MuseScore*.exe *.exe"), ("Todos", "*.*")])
+        if cam:
+            self.musescore = cam
+            self.cfg["musescore"] = cam
+            salvar_config(self.cfg)
+            self._atualizar_status_audiveris()
 
     def _localizar_manual(self):
         cam = filedialog.askopenfilename(
@@ -290,7 +362,7 @@ class App:
                 continue
             if p.suffix.lower() in EXTENSOES and str(p) not in existentes:
                 iid = self.lista.insert("", "end", values=(p.name, "Aguardando"))
-                self.itens[iid] = {"arquivo": str(p), "saidas": [], "log": ""}
+                self.itens[iid] = {"arquivo": str(p), "saidas": [], "mscz": [], "log": ""}
 
     def _adicionar(self):
         arqs = filedialog.askopenfilenames(
@@ -321,7 +393,8 @@ class App:
     def _abrir_resultado(self):
         iid = self._selecionado()
         if iid and self.itens[iid]["saidas"]:
-            for s in self.itens[iid]["saidas"]:
+            # Prefere o arquivo do MuseScore, se existir
+            for s in self.itens[iid]["mscz"] or self.itens[iid]["saidas"]:
                 abrir(s)
         else:
             messagebox.showinfo(APP_NOME, "Este arquivo ainda não foi convertido.")
@@ -367,8 +440,16 @@ class App:
         if not pendentes:
             messagebox.showinfo(APP_NOME, "Adicione ao menos um arquivo para converter.")
             return
+        quer_mscz = self.gerar_mscz.get()
+        if quer_mscz and not self.musescore:
+            if not messagebox.askyesno(
+                    APP_NOME, "Não encontrei o MuseScore neste computador.\n\n"
+                    "Converter só para MusicXML? (Você pode instalar o MuseScore em "
+                    "musescore.org ou clicar em “Localizar MuseScore…”.)"):
+                return
+            quer_mscz = False
         self.cfg.update(modo_saida=self.modo_saida.get(), pasta_saida=self.pasta_saida.get(),
-                        idioma=self.idioma.get())
+                        idioma=self.idioma.get(), gerar_mscz=self.gerar_mscz.get())
         salvar_config(self.cfg)
         self.rodando, self.cancelar = True, False
         self.bt_conv.configure(text="Cancelar")
@@ -378,10 +459,12 @@ class App:
         # Lê as opções da janela aqui, antes de ir para o segundo plano
         idioma = IDIOMAS.get(self.idioma.get(), "eng")
         destinos = {i: self._destino(self.itens[i]["arquivo"]) for i in pendentes}
-        threading.Thread(target=self._trabalhar, args=(pendentes, idioma, destinos),
+        musescore = self.musescore if quer_mscz else None
+        threading.Thread(target=self._trabalhar,
+                         args=(pendentes, idioma, destinos, musescore),
                          daemon=True).start()
 
-    def _trabalhar(self, pendentes, idioma, destinos):
+    def _trabalhar(self, pendentes, idioma, destinos, musescore=None):
         total = len(pendentes)
         for n, iid in enumerate(pendentes, 1):
             if self.cancelar:
@@ -401,7 +484,23 @@ class App:
                     self.audiveris, arq, destinos[iid], ler,
                     ao_iniciar=lambda p: setattr(self, "processo", p), idioma=idioma)
                 self.itens[iid].update(saidas=[str(s) for s in saidas], log=log)
-                if avisos > 25:
+
+                # Passo extra: gerar o arquivo do MuseScore
+                erro_ms = None
+                if musescore and not self.cancelar:
+                    self.fila.put(("msg", f"[{n}/{total}] {nome}: criando arquivo do MuseScore…"))
+                    try:
+                        self.itens[iid]["mscz"] = [
+                            str(para_musescore(musescore, s,
+                                               ao_iniciar=lambda p: setattr(self, "processo", p)))
+                            for s in saidas]
+                    except Exception as e:
+                        erro_ms = e
+                        self.itens[iid]["log"] += "\n\n--- MuseScore ---\n" + str(e)
+
+                if erro_ms and not self.cancelar:
+                    st = "✔ MusicXML pronto — MuseScore falhou"
+                elif avisos > 25:
                     st = f"✔ Pronto — revisar ({avisos} avisos)"
                 else:
                     st = "✔ Pronto"
