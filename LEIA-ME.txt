@@ -1,5 +1,5 @@
-NATURE CONVERSOR — Partituras em PDF para MuseScore e MusicXML
-==============================================================
+NATURE CONVERSOR — Partituras em PDF ou MIDI para MuseScore e MusicXML
+======================================================================
 
 Versão portátil: não precisa instalar nada.
 
@@ -7,8 +7,9 @@ COMO USAR
 
 1. Descompacte o ZIP numa pasta (ex.: Documentos).
 2. Abra "Nature Conversor.exe".
-3. Clique em "Adicionar arquivos" (ou arraste os PDFs para a lista).
-4. Escolha o idioma das letras, se houver.
+3. Clique em "Adicionar arquivos" (ou arraste os arquivos para a lista).
+   Aceita PDF, imagens (PNG, JPG, TIFF) e MIDI (.mid, .midi, .kar).
+4. Escolha o idioma das letras, se houver (vale só para PDF).
 5. Deixe marcada a opção "Também criar arquivo do MuseScore"
    para receber o .mscz além do MusicXML (.mxl).
 6. Clique em "Converter".
@@ -18,6 +19,15 @@ COMO USAR
 O arquivo .mscz é criado pelo MuseScore instalado no seu
 computador (musescore.org). Sem ele, o programa entrega só
 o MusicXML, que o MuseScore também abre.
+
+ARQUIVOS MIDI
+
+A conversão de MIDI é feita inteiramente pelo MuseScore, então
+ele precisa estar instalado. Um MIDI guarda notas tocadas, não
+a partitura escrita: a divisão em vozes, ritmos e compassos é
+uma interpretação do MuseScore e pode pedir ajustes. MIDIs
+gravados ao vivo (tocados num teclado) costumam sair bem mais
+bagunçados que os exportados por programas de notação.
 
 Dica: clique com o botão direito no .exe e crie um atalho
 na área de trabalho.

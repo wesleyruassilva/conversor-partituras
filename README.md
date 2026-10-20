@@ -1,7 +1,7 @@
 # Nature Conversor
 
-Converte partituras em PDF (ou imagem) para **MuseScore (.mscz)** e **MusicXML**, com uma janela simples para Windows.
-Usa o [Audiveris](https://github.com/Audiveris/audiveris) para o reconhecimento e o MuseScore instalado no computador para gerar o `.mscz`.
+Converte partituras em PDF (ou imagem) e arquivos **MIDI** para **MuseScore (.mscz)** e **MusicXML**, com uma janela simples para Windows.
+Usa o [Audiveris](https://github.com/Audiveris/audiveris) para o reconhecimento e o MuseScore instalado no computador para gerar o `.mscz` e converter os MIDI.
 
 ## Baixar
 

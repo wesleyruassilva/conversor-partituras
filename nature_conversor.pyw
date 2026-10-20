@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Nature Conversor — partituras em PDF para MuseScore e MusicXML
-Interface amigável para o Audiveris (https://audiveris.github.io).
+Nature Conversor — partituras em PDF ou MIDI para MuseScore e MusicXML
+Interface amigável para o Audiveris (https://audiveris.github.io) e o MuseScore.
 
 Requisitos: Python 3.9+ (com Tkinter, padrão no instalador do Windows)
             e Audiveris 5.x instalado.
@@ -22,7 +22,13 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 APP_NOME = "Nature Conversor"
-EXTENSOES = (".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp")
+EXT_IMAGEM = (".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp")
+EXT_MIDI = (".mid", ".midi", ".kar")
+EXTENSOES = EXT_IMAGEM + EXT_MIDI
+
+
+def eh_midi(caminho):
+    return Path(caminho).suffix.lower() in EXT_MIDI
 CONFIG = Path(os.environ.get("APPDATA", Path.home())) / "NatureConversor" / "config.json"
 
 # Etapas do Audiveris, para mostrar progresso legível
@@ -186,12 +192,16 @@ def localizar_musescore(cfg):
     return None
 
 
-def para_musescore(musescore, mxl, ao_iniciar=None):
-    """Converte um .mxl em .mscz usando o MuseScore. Devolve o caminho do .mscz."""
-    mxl = Path(mxl)
-    destino = mxl.with_suffix(".mscz")
+def musescore_exportar(musescore, entrada, destino, ao_iniciar=None):
+    """
+    Pede ao MuseScore para abrir `entrada` e salvar em `destino`.
+    O formato sai da extensão do destino (.mscz, .mxl...). Devolve (destino, log).
+    """
+    destino = Path(destino)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    inicio = time.time() - 2
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    proc = subprocess.Popen([musescore, "-o", str(destino), str(mxl)],
+    proc = subprocess.Popen([musescore, "-o", str(destino), str(entrada)],
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             creationflags=flags)
     if ao_iniciar:
@@ -201,10 +211,37 @@ def para_musescore(musescore, mxl, ao_iniciar=None):
     except subprocess.TimeoutExpired:
         proc.kill()
         raise RuntimeError("O MuseScore demorou demais e foi interrompido.")
-    if not destino.is_file():
-        texto = saida.decode("utf-8", errors="replace")[-2000:]
-        raise RuntimeError(f"O MuseScore não gerou o arquivo .mscz.\n{texto}")
+    texto = (saida or b"").decode("utf-8", errors="replace")
+    # Confere se o arquivo foi realmente (re)gravado agora
+    if not destino.is_file() or destino.stat().st_mtime < inicio:
+        raise RuntimeError(f"O MuseScore não gerou {destino.name}.\n{texto[-2000:]}")
+    return destino, texto
+
+
+def para_musescore(musescore, mxl, ao_iniciar=None):
+    """Converte um .mxl em .mscz usando o MuseScore. Devolve o caminho do .mscz."""
+    mxl = Path(mxl)
+    destino, _ = musescore_exportar(musescore, mxl, mxl.with_suffix(".mscz"), ao_iniciar)
     return destino
+
+
+def converter_midi(musescore, entrada, pasta_saida, gerar_mscz=True, ao_iniciar=None):
+    """
+    Converte um MIDI em MusicXML (.mxl) e, opcionalmente, em .mscz.
+    Devolve (lista_de_mxl, lista_de_mscz, log).
+    """
+    entrada = Path(entrada)
+    base = Path(pasta_saida) / entrada.stem
+    log = [f"Arquivo MIDI: {entrada}"]
+    mxl, texto = musescore_exportar(musescore, entrada, base.with_suffix(".mxl"), ao_iniciar)
+    log += [f"--- MusicXML: {mxl.name} ---", texto]
+    msczs = []
+    if gerar_mscz:
+        mscz, texto = musescore_exportar(musescore, entrada, base.with_suffix(".mscz"),
+                                         ao_iniciar)
+        msczs.append(mscz)
+        log += [f"--- MuseScore: {mscz.name} ---", texto]
+    return [mxl], msczs, "\n".join(log)
 
 
 def abrir(caminho):
@@ -250,7 +287,8 @@ class App:
         f.pack(fill="both", expand=True)
 
         ttk.Label(f, text=APP_NOME, style="Titulo.TLabel").pack(anchor="w")
-        ttk.Label(f, text="Partituras em PDF para MuseScore e MusicXML").pack(anchor="w")
+        ttk.Label(f, text="Partituras em PDF ou arquivos MIDI para MuseScore e MusicXML"
+                  ).pack(anchor="w")
         dica = ("1. Adicione os arquivos   2. Clique em Converter   3. Abra o resultado"
                 + ("   •   Você também pode arrastar arquivos para a lista" if TEM_DND else ""))
         ttk.Label(f, text=dica, style="Dica.TLabel").pack(anchor="w", pady=(2, 12))
@@ -289,7 +327,7 @@ class App:
         s.pack(fill="x", pady=(4, 8))
         self.modo_saida = tk.StringVar(value=self.cfg.get("modo_saida", "mesma"))
         self.pasta_saida = tk.StringVar(value=self.cfg.get("pasta_saida", ""))
-        ttk.Radiobutton(s, text="Na mesma pasta do PDF", value="mesma",
+        ttk.Radiobutton(s, text="Na mesma pasta do arquivo original", value="mesma",
                         variable=self.modo_saida).grid(row=0, column=0, sticky="w")
         ttk.Radiobutton(s, text="Nesta pasta:", value="fixa",
                         variable=self.modo_saida).grid(row=1, column=0, sticky="w")
@@ -300,7 +338,7 @@ class App:
         # Idioma das letras / textos
         lin = ttk.Frame(f)
         lin.pack(fill="x", pady=(0, 8))
-        ttk.Label(lin, text="Idioma das letras:").pack(side="left")
+        ttk.Label(lin, text="Idioma das letras (PDF):").pack(side="left")
         self.idioma = tk.StringVar(value=self.cfg.get("idioma", "Português"))
         ttk.Combobox(lin, textvariable=self.idioma, values=list(IDIOMAS),
                      state="readonly", width=16).pack(side="left", padx=6)
@@ -378,8 +416,11 @@ class App:
 
     def _adicionar(self):
         arqs = filedialog.askopenfilenames(
-            title="Escolha as partituras",
-            filetypes=[("Partituras", " ".join("*" + e for e in EXTENSOES)), ("Todos", "*.*")])
+            title="Escolha as partituras ou arquivos MIDI",
+            filetypes=[("Partituras e MIDI", " ".join("*" + e for e in EXTENSOES)),
+                       ("PDF e imagens", " ".join("*" + e for e in EXT_IMAGEM)),
+                       ("MIDI", " ".join("*" + e for e in EXT_MIDI)),
+                       ("Todos", "*.*")])
         self._incluir(arqs)
 
     def _soltar(self, evento):
@@ -393,7 +434,7 @@ class App:
             self.itens.pop(iid, None)
 
     def _escolher_pasta(self):
-        p = filedialog.askdirectory(title="Pasta para salvar os MusicXML")
+        p = filedialog.askdirectory(title="Pasta para salvar os resultados")
         if p:
             self.pasta_saida.set(p)
             self.modo_saida.set("fixa")
@@ -442,18 +483,36 @@ class App:
                 self.processo.kill()
             self.msg.set("Cancelando…")
             return
-        if not self.audiveris:
-            messagebox.showwarning(
-                APP_NOME, "Não encontrei o Audiveris.\n\nInstale-o (veja o LEIA-ME) "
-                "ou clique em “Localizar Audiveris…”.")
-            return
         pendentes = [i for i in self.lista.get_children()
                      if not self.itens[i]["saidas"]]
         if not pendentes:
             messagebox.showinfo(APP_NOME, "Adicione ao menos um arquivo para converter.")
             return
+
+        # Cada tipo de arquivo precisa de um programa diferente
+        midis = [i for i in pendentes if eh_midi(self.itens[i]["arquivo"])]
+        imagens = [i for i in pendentes if i not in midis]
+        if midis and not self.musescore:
+            if not imagens:
+                messagebox.showwarning(
+                    APP_NOME, "Para converter MIDI é preciso ter o MuseScore instalado.\n\n"
+                    "Instale em musescore.org ou clique em “Localizar MuseScore…”.")
+                return
+            if not messagebox.askyesno(
+                    APP_NOME, "Os arquivos MIDI precisam do MuseScore, que não encontrei.\n\n"
+                    "Converter só os PDFs e imagens?"):
+                return
+            for i in midis:
+                self.lista.set(i, "status", "✖ Precisa do MuseScore")
+            pendentes, midis = imagens, []
+        if imagens and not self.audiveris:
+            messagebox.showwarning(
+                APP_NOME, "Não encontrei o Audiveris, necessário para PDFs e imagens.\n\n"
+                "Instale-o (veja o LEIA-ME) ou clique em “Localizar Audiveris…”.")
+            return
+
         quer_mscz = self.gerar_mscz.get()
-        if quer_mscz and not self.musescore:
+        if quer_mscz and imagens and not self.musescore:
             if not messagebox.askyesno(
                     APP_NOME, "Não encontrei o MuseScore neste computador.\n\n"
                     "Converter só para MusicXML? (Você pode instalar o MuseScore em "
@@ -471,12 +530,11 @@ class App:
         # Lê as opções da janela aqui, antes de ir para o segundo plano
         idioma = IDIOMAS.get(self.idioma.get(), "eng")
         destinos = {i: self._destino(self.itens[i]["arquivo"]) for i in pendentes}
-        musescore = self.musescore if quer_mscz else None
         threading.Thread(target=self._trabalhar,
-                         args=(pendentes, idioma, destinos, musescore),
+                         args=(pendentes, idioma, destinos, self.musescore, quer_mscz),
                          daemon=True).start()
 
-    def _trabalhar(self, pendentes, idioma, destinos, musescore=None):
+    def _trabalhar(self, pendentes, idioma, destinos, musescore=None, quer_mscz=False):
         total = len(pendentes)
         for n, iid in enumerate(pendentes, 1):
             if self.cancelar:
@@ -485,6 +543,25 @@ class App:
             nome = Path(arq).name
             self.fila.put(("status", iid, "Convertendo…"))
             self.fila.put(("msg", f"[{n}/{total}] {nome}: iniciando"))
+
+            # MIDI: vai direto para o MuseScore, sem reconhecimento ótico
+            if eh_midi(arq):
+                self.fila.put(("msg", f"[{n}/{total}] {nome}: convertendo MIDI no MuseScore…"))
+                try:
+                    mxls, msczs, log = converter_midi(
+                        musescore, arq, destinos[iid], gerar_mscz=quer_mscz,
+                        ao_iniciar=lambda p: setattr(self, "processo", p))
+                    self.itens[iid].update(saidas=[str(s) for s in mxls],
+                                           mscz=[str(s) for s in msczs], log=log)
+                    self.fila.put(("status", iid, "✔ Pronto (MIDI)"))
+                except Exception as e:
+                    if self.cancelar:
+                        self.fila.put(("status", iid, "Cancelado"))
+                    else:
+                        self.itens[iid]["log"] = str(e)
+                        self.fila.put(("status", iid, "✖ Falhou — ver detalhes"))
+                self.fila.put(("passo",))
+                continue
 
             def ler(linha, nome=nome, n=n):
                 for etapa, texto in ETAPAS.items():
@@ -499,7 +576,7 @@ class App:
 
                 # Passo extra: gerar o arquivo do MuseScore
                 erro_ms = None
-                if musescore and not self.cancelar:
+                if quer_mscz and musescore and not self.cancelar:
                     self.fila.put(("msg", f"[{n}/{total}] {nome}: criando arquivo do MuseScore…"))
                     try:
                         self.itens[iid]["mscz"] = [
